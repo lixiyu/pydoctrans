@@ -154,7 +154,7 @@ def _track_request(format: str, file_size: int):
 app = FastAPI(
     title="pydoctrans",
     description="Python Document Transformer — HTTP API",
-    version="0.3.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
