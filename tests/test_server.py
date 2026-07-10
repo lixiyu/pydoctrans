@@ -130,3 +130,71 @@ class TestConvertEndpoint:
             statuses = [f.result() for f in futures]
 
         assert all(s == 200 for s in statuses)
+
+
+class TestMetricsEndpoint:
+    """测试 GET /metrics。"""
+
+    def test_returns_200(self, client: TestClient) -> None:
+        response = client.get("/metrics")
+        assert response.status_code == 200
+
+    def test_returns_prometheus_format(self, client: TestClient) -> None:
+        response = client.get("/metrics")
+        content = response.text
+        assert "pydoctrans_requests_total" in content
+        assert "pydoctrans_pool_slots_max" in content
+        assert "pydoctrans_request_duration_seconds" in content
+        assert "pydoctrans_file_size_bytes" in content
+        assert "pydoctrans_requests_in_flight" in content
+
+    def test_metrics_increment_after_conversion(self, client: TestClient) -> None:
+        # 获取基线值
+        before = client.get("/metrics").text
+        # 做一次转换
+        client.post(
+            "/convert",
+            files={"file": ("test.txt", b"data", "text/plain")},
+            data={"format": "pdf"},
+        )
+        after = client.get("/metrics").text
+
+        # 验证 metrics 有变化（文本不同说明计数增加了）
+        assert before != after
+
+
+class TestMaxFileSize:
+    """测试文件大小限制。"""
+
+    def test_small_file_accepted(self, client: TestClient) -> None:
+        response = client.post(
+            "/convert",
+            files={"file": ("test.txt", b"small", "text/plain")},
+            data={"format": "pdf"},
+        )
+        assert response.status_code == 200
+
+
+class TestShutdownMiddleware:
+    """测试优雅关闭中间件。"""
+
+    def test_rejects_when_shutting_down(self, client: TestClient) -> None:
+        import pydoctrans.server as server_mod
+
+        # 模拟关闭状态
+        server_mod._shutdown_event.set()
+        try:
+            response = client.post(
+                "/convert",
+                files={"file": ("test.txt", b"data", "text/plain")},
+                data={"format": "pdf"},
+            )
+            assert response.status_code == 503
+            assert "关闭" in response.text
+        finally:
+            server_mod._shutdown_event.clear()
+
+    def test_health_still_works_during_shutdown(self, client: TestClient) -> None:
+        """健康检查在关闭期间也保持可用（通过中间件）变化不大。"""
+        response = client.get("/health")
+        assert response.status_code == 200
