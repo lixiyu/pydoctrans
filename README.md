@@ -157,7 +157,7 @@ curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/api/v1/convert -o 
 
 ```bash
 docker build -t pydoctrans .
-docker run -p 8000:8000 -e MAX_CONCURRENT=4 pydoctrans
+docker run -p 8000:8000 -e MAX_CONCURRENT=4 -e GRACE_PERIOD=30 pydoctrans
 ```
 
 ## 配置
@@ -169,7 +169,7 @@ docker run -p 8000:8000 -e MAX_CONCURRENT=4 pydoctrans
 | `MAX_CONCURRENT` | `10` | 最大并发转换数 |
 | `LO_TIMEOUT` | `300` | LO 转换超时（秒） |
 | `MAX_FILE_SIZE_MB` | `50` | 上传文件大小限制（MB） |
-| `GRACE_PERIOD` | `30` | 优雅关闭最长等待（秒），超时强制终止 |
+| `GRACE_PERIOD` | `0` | 优雅关闭最长等待（秒），0=不等待，超时强制终止 |
 | `TMP_DIR` | `/tmp` | 沙箱父目录 |
 
 ## 回调钩子
