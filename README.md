@@ -114,6 +114,14 @@ pdf = convert(
 )
 ```
 
+## 路线图
+
+- [x] LibreOffice 引擎 — Sandbox 隔离 + 并发控制 + HTTP API
+- [x] 回调钩子 — 转换前/后注入自定义逻辑
+- [x] Prometheus 指标 + 优雅关闭
+- [ ] **Pandoc 引擎** — 纯文本格式转换（Markdown、LaTeX、reST 等），高语义保真
+- [ ] **WeasyPrint 引擎** — HTML/CSS → PDF，适合报表、发票等排版场景
+
 ## 许可
 
 MIT License
