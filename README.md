@@ -1,8 +1,38 @@
 # pydoctrans
 
-Python Document Transformer — 简单、稳定、快速的服务端文档格式转换。
+把 LibreOffice 驯服成可靠的服务端文档转换引擎。
 
-基于 LibreOffice 引擎，支持 Word/Excel/PPT → PDF 及多种格式互转。
+`pip install pydoctrans`，三行代码把 Word/Excel/PPT 转成 PDF。**不会卡死、不会僵尸进程、不会一个文件拖垮整个服务。**
+
+---
+
+### 如果你在服务端用过 LibreOffice，这些场景你大概率见过
+
+```
+# 同时来两个请求，第二个悄悄丢了——LO 单实例锁，根本不能并行
+# 文件大一点就卡住，没超时，没响应，整个队列堵死
+# 和 CUDA / 其他系统库冲突，莫名其妙 Signal 11 崩溃
+# 僵尸进程堆了几十个，没人回收
+# 并发一多直接 OOM，一个 soffice.bin 吃 1G 内存
+```
+
+### pydoctrans 怎么解决的
+
+| 你的痛点 | pydoctrans 的做法 |
+|----------|------------------|
+| 不能并行 | **HOME 目录隔离**：每次转换独立 `~/.config/libreoffice`，管道名不同，真正并行跑 |
+| 卡死没响应 | **请求级超时**：`subprocess.run(timeout)` → SIGTERM → SIGKILL → waitpid，不留僵尸 |
+| 库冲突崩溃 | **LD_LIBRARY_PATH 锁定**：LO 只加载自己 `program/` 下的 `.so`，不碰 CUDA 或系统库 |
+| OOM | **Semaphore 槽位控制**：`MAX_CONCURRENT` 限制同时在跑的 LO 进程数 |
+| 一个坏文件堵全部 | **独立进程 + 超时兜底**：坏文件超时被杀，不影响其他请求 |
+| 关闭丢任务 | **优雅关闭**：SIGTERM → 拒新请求 → 等在途完成 → 清理沙箱 |
+
+### 可靠性的底线
+
+- **中文字体开箱即用**：Docker 镜像预装 Noto CJK，不再满屏豆腐块
+- **文件类型自动检测**：URL 下载的文件没扩展名？读魔术字节，PDF/DOCX/ODT 自己认
+- **指数退避重试**：URL 下载失败 1s → 2s → 4s 自动重试
+- **孤儿沙箱自动清理**：进程崩溃残留的临时目录，启动时扫描清理
 
 ## 快速开始
 
@@ -22,14 +52,16 @@ with open("report.pdf", "wb") as f:
 
 ## 特性
 
-- **零依赖外部服务**：直接调用 LibreOffice，无需额外部署
-- **沙箱隔离**：每次转换独立 HOME 目录，避免命名管道冲突，支持真正并行
-- **并发控制**：Semaphore 限制 LO 进程数，防止 OOM
-- **超时保护**：请求级超时，避免僵尸进程
-- **回调钩子**：转换前/后注入自定义逻辑（水印、加密、上传）
-- **HTTP API**：可独立部署为微服务，Docker 镜像开箱即用
-- **Prometheus 指标**：请求数、耗时、槽位利用率实时监控
-- **优雅关闭**：SIGTERM 下等在途任务完成，拒绝新请求
+- **真正并行**：每个转换独立 HOME 目录，不受 LO 单实例限制
+- **超时兜底**：请求级超时，超时即杀，不留僵尸进程
+- **库冲突隔离**：LD_LIBRARY_PATH 锁定 LO 自身目录，不与 CUDA 等组件冲突
+- **并发槽位**：Semaphore 控制 LO 进程上限，防止 OOM
+- **中文字体**：Docker 镜像预装 Noto CJK，中文文档不出乱码
+- **文件类型检测**：魔术字节自动识别，无扩展名的文件也能正确转换
+- **回调钩子**：转换前/后注入自定义逻辑（校验、水印、上传 S3）
+- **HTTP API**：独立微服务部署，Docker 开箱即用
+- **Prometheus 指标**：请求数、耗时、槽位利用率实时可观测
+- **优雅关闭**：SIGTERM 下等在途任务完成，不丢请求
 
 ## 使用方式
 
@@ -64,14 +96,15 @@ pdf = convert(docx, to="pdf", file_name="r.docx", after=[log_size])
 ### HTTP API
 
 ```
-POST /convert   — 上传文件 → 转换 → 返回文件
-GET  /health    — 健康检查
-GET  /engines   — 可用引擎列表
-GET  /metrics   — Prometheus 指标
+POST /api/v1/convert       — 上传文件 → 转换 → 返回文件
+POST /api/v1/convert/url   — 从 URL 下载 → 转换
+GET  /api/v1/health        — 健康检查
+GET  /api/v1/engines       — 可用引擎列表
+GET  /metrics              — Prometheus 指标
 ```
 
 ```bash
-curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/convert -o report.pdf
+curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/api/v1/convert -o report.pdf
 ```
 
 ### Docker
