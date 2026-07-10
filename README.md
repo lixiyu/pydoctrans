@@ -63,6 +63,52 @@ with open("report.pdf", "wb") as f:
 - **Prometheus 指标**：请求数、耗时、槽位利用率实时可观测
 - **优雅关闭**：SIGTERM 下等在途任务完成，不丢请求
 
+## 纯 Python，怎么用都行
+
+整项目都是 Python 代码，零二进制依赖，模块边界干净。没有"下载个 Java 服务"、"装个 Go 二进制"这种事。
+
+```
+pydoctrans/
+├── engine/        ← 转换引擎抽象（加新引擎只需实现 Engine 基类）
+├── sandbox.py     ← HOME 隔离，独立模块，可单独拿出来用
+├── pool.py        ← 并发控制，Semaphore 封装，不绑死 LO
+├── env.py         ← 环境检测，支持 Linux/macOS/手动安装/Snap/Flatpak
+├── filetype.py    ← 魔术字节检测，独立可复用
+├── hooks.py       ← 回调钩子系统，Protocol 协议，不侵入引擎
+├── convert.py     ← 公共 API，三行代码接入
+├── server.py      ← FastAPI 服务，可独立部署
+└── __main__.py    ← CLI 入口
+```
+
+### 五种调用方式，同一套内核
+
+```python
+# ① 代码调用 — 嵌入你的 Python 项目
+from pydoctrans import convert
+pdf = convert(docx_bytes, to="pdf", file_name="report.docx")
+```
+
+```bash
+# ② 命令行 — 运维脚本、CI/CD
+python -m pydoctrans convert report.docx -t pdf
+```
+
+```bash
+# ③ HTTP 服务 — 跨语言调用（Java/Go/Node 都能用）
+python -m pydoctrans serve --port 8000
+curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/api/v1/convert
+```
+
+```yaml
+# ④ Docker — 一条命令拉起
+docker run -p 8000:8000 pydoctrans
+
+# ⑤ Docker Compose — 生产部署
+docker compose up -d
+```
+
+不管你是在 FastAPI 项目里当库使、在 Airflow 里用命令行调、还是微服务架构里独立部署，内核完全一样，没学两套东西。
+
 ## 使用方式
 
 ### 命令行
