@@ -373,7 +373,7 @@ async def list_engines() -> dict:
     }
 
 
-@v1.get("/metrics")
+@app.get("/metrics")
 async def metrics() -> Response:
     """Prometheus 指标端点。"""
     return Response(

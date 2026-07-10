@@ -136,11 +136,11 @@ class TestMetricsEndpoint:
     """测试 GET /metrics。"""
 
     def test_returns_200(self, client: TestClient) -> None:
-        response = client.get("/api/v1/metrics")
+        response = client.get("/metrics")
         assert response.status_code == 200
 
     def test_returns_prometheus_format(self, client: TestClient) -> None:
-        response = client.get("/api/v1/metrics")
+        response = client.get("/metrics")
         content = response.text
         assert "pydoctrans_requests_total" in content
         assert "pydoctrans_pool_slots_max" in content
@@ -150,14 +150,14 @@ class TestMetricsEndpoint:
 
     def test_metrics_increment_after_conversion(self, client: TestClient) -> None:
         # 获取基线值
-        before = client.get("/api/v1/metrics").text
+        before = client.get("/metrics").text
         # 做一次转换
         client.post(
             "/api/v1/convert",
             files={"file": ("test.txt", b"data", "text/plain")},
             data={"to": "pdf"},
         )
-        after = client.get("/api/v1/metrics").text
+        after = client.get("/metrics").text
 
         # 验证 metrics 有变化（文本不同说明计数增加了）
         assert before != after
