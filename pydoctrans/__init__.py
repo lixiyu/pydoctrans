@@ -4,4 +4,7 @@ A document conversion tool that leverages LibreOffice for server-side
 format conversion with sandbox isolation and concurrency control.
 """
 
-__version__ = "0.1.0"
+from pydoctrans.convert import ConversionError, convert
+
+__all__ = ["convert", "ConversionError"]
+__version__ = "0.2.0"
