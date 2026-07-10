@@ -26,7 +26,7 @@ def validate_size(ctx: ConversionContext) -> None:
 def sanitize_name(ctx: ConversionContext) -> None:
     ctx.file_name = ctx.file_name.replace(" ", "_")
 
-pdf = convert(docx, format="pdf", file_name="my doc.docx",
+pdf = convert(docx, to="pdf", file_name="my doc.docx",
               before=[validate_size, sanitize_name])
 ```
 
@@ -41,12 +41,12 @@ def watermark(ctx: ConversionContext) -> None:
 
 def upload_to_s3(ctx: ConversionContext) -> None:
     """自动上传到 S3。"""
-    key = f"converted/{ctx.meta.get('id', 'unknown')}.{ctx.format}"
+    key = f"converted/{ctx.meta.get('id', 'unknown')}.{ctx.to}"
     url = s3_client.put_object(key, ctx.data)
     ctx.meta["s3_url"] = url
 
 pdf = convert(
-    docx, format="pdf", file_name="report.docx",
+    docx, to="pdf", file_name="report.docx",
     after=[watermark, upload_to_s3],
 )
 print("上传到:", pdf_ctx.meta.get("s3_url"))
@@ -60,7 +60,7 @@ after 钩子抛出异常 → 不阻断其他钩子执行，所有错误聚合为
 
 ```python
 try:
-    convert(data, format="pdf", file_name="f.docx", after=[hook1, hook2])
+    convert(data, to="pdf", file_name="f.docx", after=[hook1, hook2])
 except HookExecutionError as e:
     for name, exc in e.errors:
         print(f"    {name}: {exc}")

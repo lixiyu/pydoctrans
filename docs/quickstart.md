@@ -18,7 +18,7 @@ from pydoctrans import convert
 
 # Word → PDF
 with open("report.docx", "rb") as f:
-    pdf_bytes = convert(f.read(), format="pdf", file_name="report.docx")
+    pdf_bytes = convert(f.read(), to="pdf", file_name="report.docx")
 
 with open("report.pdf", "wb") as f:
     f.write(pdf_bytes)

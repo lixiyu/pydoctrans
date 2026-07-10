@@ -89,7 +89,7 @@ docker run -p 8000:8000 -e MAX_CONCURRENT=4 pydoctrans
 |------|--------|------|
 | `MAX_CONCURRENT` | `10` | 最大并发转换数 |
 | `LO_TIMEOUT` | `300` | LO 转换超时（秒） |
-| `MAX_FILE_SIZE` | `52428800` | 上传文件大小限制（字节） |
+| `MAX_FILE_SIZE_MB` | `50` | 上传文件大小限制（MB） |
 | `GRACE_PERIOD` | `30` | 优雅关闭等待时间（秒） |
 | `TMP_DIR` | `/tmp` | 沙箱父目录 |
 

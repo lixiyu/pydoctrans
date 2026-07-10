@@ -5,7 +5,7 @@
 ```python
 from pydoctrans import convert
 
-pdf = convert(data, format="pdf", *, file_name="input.bin", timeout=None,
+pdf = convert(data, to="pdf", *, file_name="input.bin", timeout=None,
               before=None, after=None)
 ```
 
