@@ -58,14 +58,14 @@ class TestConvertEndpoint:
         response = client.post(
             "/convert",
             files={"file": ("hello.txt", b"Hello pydoctrans!", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         assert response.status_code == 200
         assert int(response.headers.get("content-length", "0")) > 0
         assert response.headers.get("x-engine") == "libreoffice"
 
     def test_missing_file_returns_422(self, client: TestClient) -> None:
-        response = client.post("/convert", data={"format": "pdf"})
+        response = client.post("/convert", data={"to": "pdf"})
         assert response.status_code == 422
 
     def test_missing_format_defaults_to_pdf(self, client: TestClient) -> None:
@@ -80,7 +80,7 @@ class TestConvertEndpoint:
         response = client.post(
             "/convert",
             files={"file": ("hello.txt", b"Hello!", "text/plain")},
-            data={"format": "zzz_invalid_format"},
+            data={"to": "zzz_invalid_format"},
         )
         assert response.status_code == 400
 
@@ -89,7 +89,7 @@ class TestConvertEndpoint:
         response = client.post(
             "/convert",
             files={"file": ("", b"...", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         assert response.status_code == 422
 
@@ -98,7 +98,7 @@ class TestConvertEndpoint:
         response = client.post(
             "/convert",
             files={"file": ("empty.txt", b"", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         # 空文件 LO 仍能生成 PDF（可能是空白页）
         assert response.status_code == 200
@@ -107,7 +107,7 @@ class TestConvertEndpoint:
         response = client.post(
             "/convert",
             files={"file": ("test.txt", b"data", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         assert "content-disposition" in response.headers
         assert "x-engine" in response.headers
@@ -121,7 +121,7 @@ class TestConvertEndpoint:
             resp = client.post(
                 "/convert",
                 files={"file": (f"test_{i}.txt", f"content {i}".encode(), "text/plain")},
-                data={"format": "pdf"},
+                data={"to": "pdf"},
             )
             return resp.status_code
 
@@ -155,7 +155,7 @@ class TestMetricsEndpoint:
         client.post(
             "/convert",
             files={"file": ("test.txt", b"data", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         after = client.get("/metrics").text
 
@@ -170,7 +170,7 @@ class TestMaxFileSize:
         response = client.post(
             "/convert",
             files={"file": ("test.txt", b"small", "text/plain")},
-            data={"format": "pdf"},
+            data={"to": "pdf"},
         )
         assert response.status_code == 200
 
@@ -187,7 +187,7 @@ class TestShutdownMiddleware:
             response = client.post(
                 "/convert",
                 files={"file": ("test.txt", b"data", "text/plain")},
-                data={"format": "pdf"},
+                data={"to": "pdf"},
             )
             assert response.status_code == 503
             assert "关闭" in response.text
