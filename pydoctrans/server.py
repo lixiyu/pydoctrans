@@ -8,9 +8,15 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+import tempfile
 import threading
 import time
+import urllib.parse
+import urllib.request
+import uuid
 from contextlib import asynccontextmanager, contextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -34,6 +40,7 @@ logger = logging.getLogger(__name__)
 # ---- 配置 ----
 MAX_FILE_SIZE = int(os.environ.get("MAX_FILE_SIZE", str(50 * 1024 * 1024)))  # 50MB
 GRACE_PERIOD = int(os.environ.get("GRACE_PERIOD", "30"))  # 优雅关闭等待秒数
+TMP_DIR = os.environ.get("TMP_DIR", "/tmp")
 
 # ---- 全局状态 ----
 _engine: Optional[LibreOfficeEngine] = None
@@ -181,7 +188,77 @@ async def timeout_error_handler(request: Request, exc: TimeoutError) -> Response
     )
 
 
-# ---- Endpoints ----
+# ---- 辅助函数 ----
+
+DOWNLOAD_RETRIES = int(os.environ.get("DOWNLOAD_RETRIES", "3"))
+
+
+def _attachment_response(data: bytes, filename: str, engine: str, elapsed_s: float) -> Response:
+    """构造文件下载响应，安全处理中文文件名。
+
+    HTTP header 只支持 latin-1，含非 ASCII 字符的文件名必须
+    用 RFC 5987 的 ``filename*=UTF-8''...`` 格式。
+    """
+    encoded = urllib.parse.quote(filename, safe="")
+    disposition = f"attachment; filename*=UTF-8''{encoded}"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": disposition,
+            "X-Engine": engine,
+            "X-Elapsed": str(elapsed_s),
+        },
+    )
+DOWNLOAD_RETRY_DELAY = float(os.environ.get("DOWNLOAD_RETRY_DELAY", "1.0"))
+DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
+
+
+def _url_basename(url: str) -> str:
+    """从 URL 中提取文件名，无法提取时返回 download_{uuid}。"""
+    from urllib.parse import urlparse
+
+    path = urlparse(url).path
+    name = Path(path).name
+    if name and "." in name:
+        return name
+    return f"download_{uuid.uuid4().hex[:8]}"
+
+
+def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
+    """下载 URL 内容到临时目录，支持重试。返回 (文件名, 内容)。"""
+    file_name = _url_basename(url)
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, DOWNLOAD_RETRIES + 1):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "pydoctrans/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+                content = resp.read()
+                # 检查 Content-Length（如果声明了）
+                content_length = resp.headers.get("Content-Length")
+                if content_length and len(content) != int(content_length):
+                    raise IOError(
+                        f"下载不完整：预期 {content_length} 字节，收到 {len(content)} 字节"
+                    )
+            logger.info("URL 下载成功: %s (%d bytes, attempt %d/%d)",
+                        url, len(content), attempt, DOWNLOAD_RETRIES)
+            return file_name, content
+        except Exception as e:
+            last_error = e
+            if attempt < DOWNLOAD_RETRIES:
+                logger.warning(
+                    "URL 下载失败 (attempt %d/%d): %s — %s 秒后重试",
+                    attempt, DOWNLOAD_RETRIES, e, DOWNLOAD_RETRY_DELAY,
+                )
+                time.sleep(DOWNLOAD_RETRY_DELAY)
+
+    raise IOError(
+        f"URL 下载失败（已重试 {DOWNLOAD_RETRIES} 次）: {url} — {last_error}"
+    )
 
 @app.get("/health")
 async def health() -> dict:
@@ -266,12 +343,71 @@ async def convert(
     stem = file.filename.rsplit(".", 1)[0] if "." in file.filename else file.filename
     output_filename = f"{stem}.{format}"
 
-    return Response(
-        content=result.data,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f'attachment; filename="{output_filename}"',
-            "X-Engine": result.engine,
-            "X-Elapsed": str(result.meta.get("elapsed_s", "")),
-        },
+    return _attachment_response(
+        result.data, output_filename, result.engine,
+        result.meta.get("elapsed_s", ""),
     )
+
+
+@app.post("/convert/url")
+async def convert_url(
+    url: str = Form(...),
+    format: str = Form(default="pdf"),
+    timeout: Optional[int] = Form(default=None),
+) -> Response:
+    """从 URL 下载文件并转换为目标格式。
+
+    Args:
+        url: 源文件下载地址。
+        format: 目标格式，如 "pdf"、"odt"、"docx"。
+        timeout: 可选，本次转换的超时秒数。
+    """
+    tmpdir = tempfile.mkdtemp(prefix="pydoctrans_url_", dir=TMP_DIR)
+    try:
+        try:
+            file_name, file_data = _download_with_retries(url, tmpdir)
+        except IOError as e:
+            requests_total.labels(status="502", format=format).inc()
+            raise HTTPException(status_code=502, detail=str(e)) from e
+
+        file_len = len(file_data)
+
+        if file_len > MAX_FILE_SIZE:
+            requests_total.labels(status="413", format=format).inc()
+            raise HTTPException(
+                status_code=413,
+                detail=f"文件大小超过限制（{MAX_FILE_SIZE} 字节）",
+            )
+
+        engine = _get_engine()
+
+        with _track_request(format=format, file_size=file_len):
+            try:
+                result = engine.convert(
+                    data=file_data,
+                    file_name=file_name,
+                    format=format,
+                    timeout=timeout,
+                )
+            except ValueError as e:
+                requests_total.labels(status="400", format=format).inc()
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            except ConversionError as e:
+                requests_total.labels(status="400", format=format).inc()
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            except TimeoutError as e:
+                requests_total.labels(status="504", format=format).inc()
+                raise HTTPException(status_code=504, detail=str(e)) from e
+
+        requests_total.labels(status="200", format=format).inc()
+
+        stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+        output_filename = f"{stem}.{format}"
+
+        return _attachment_response(
+            result.data, output_filename, result.engine,
+            result.meta.get("elapsed_s", ""),
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
