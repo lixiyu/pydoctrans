@@ -38,7 +38,8 @@ from pydoctrans.metrics import (
 logger = logging.getLogger(__name__)
 
 # ---- 配置 ----
-MAX_FILE_SIZE = int(os.environ.get("MAX_FILE_SIZE", str(50 * 1024 * 1024)))  # 50MB
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE", "50"))  # 单位 MB
+MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
 GRACE_PERIOD = int(os.environ.get("GRACE_PERIOD", "30"))  # 优雅关闭等待秒数
 TMP_DIR = os.environ.get("TMP_DIR", "/tmp")
 
@@ -385,7 +386,7 @@ async def convert(
         requests_total.labels(status="413", to=to_).inc()
         raise HTTPException(
             status_code=413,
-            detail=f"文件大小超过限制（{MAX_FILE_SIZE} 字节）",
+            detail=f"文件大小超过限制（{MAX_FILE_SIZE_MB} MB）",
         )
 
     if not file.filename:
@@ -464,7 +465,7 @@ async def convert_url(
             requests_total.labels(status="413", to=to_).inc()
             raise HTTPException(
                 status_code=413,
-                detail=f"文件大小超过限制（{MAX_FILE_SIZE} 字节）",
+                detail=f"文件大小超过限制（{MAX_FILE_SIZE_MB} MB）",
             )
 
         engine = _get_engine()

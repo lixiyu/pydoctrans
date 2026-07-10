@@ -14,7 +14,7 @@ pip install pydoctrans
 from pydoctrans import convert
 
 with open("report.docx", "rb") as f:
-    pdf = convert(f.read(), format="pdf", file_name="report.docx")
+    pdf = convert(f.read(), to="pdf", file_name="report.docx")
 
 with open("report.pdf", "wb") as f:
     f.write(pdf)
@@ -52,13 +52,13 @@ python -m pydoctrans serve --port 8000
 from pydoctrans import convert, ConversionContext
 
 # 基本转换
-pdf = convert(docx_bytes, format="pdf", file_name="report.docx")
+pdf = convert(docx_bytes, to="pdf", file_name="report.docx")
 
 # 带钩子
 def log_size(ctx: ConversionContext) -> None:
     print(f"输出: {len(ctx.data)} 字节")
 
-pdf = convert(docx, format="pdf", file_name="r.docx", after=[log_size])
+pdf = convert(docx, to="pdf", file_name="r.docx", after=[log_size])
 ```
 
 ### HTTP API
@@ -108,7 +108,7 @@ def upload_to_s3(ctx: ConversionContext) -> None:
     ctx.meta["s3_url"] = s3_client.put(ctx.data)
 
 pdf = convert(
-    docx_bytes, format="pdf", file_name="report.docx",
+    docx_bytes, to="pdf", file_name="report.docx",
     before=[validate_size],
     after=[upload_to_s3],
 )

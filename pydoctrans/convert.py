@@ -3,7 +3,7 @@
 用法::
 
     from pydoctrans import convert
-    pdf_bytes = convert(docx_bytes, format="pdf")
+    pdf_bytes = convert(docx_bytes, to="pdf")
 """
 
 from __future__ import annotations
