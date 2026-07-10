@@ -69,8 +69,16 @@ class ShutdownMiddleware(BaseHTTPMiddleware):
                 status_code=503,
                 media_type="text/plain",
             )
-        # 排除 /metrics, /health, /engines 等非转换端点
-        return await call_next(request)
+        try:
+            return await call_next(request)
+        except Exception:
+            import traceback
+            logger.error("中间件捕获异常:\n%s", traceback.format_exc())
+            return Response(
+                content="内部错误",
+                status_code=500,
+                media_type="text/plain",
+            )
 
 
 @asynccontextmanager
@@ -184,6 +192,18 @@ async def timeout_error_handler(request: Request, exc: TimeoutError) -> Response
     return Response(
         content=str(exc),
         status_code=504,
+        media_type="text/plain",
+    )
+
+
+@app.exception_handler(Exception)
+async def catchall_error_handler(request: Request, exc: Exception) -> Response:
+    """兜底异常处理——打印完整 traceback 到日志。"""
+    import traceback
+    logger.error("未捕获异常: %s\n%s", exc, traceback.format_exc())
+    return Response(
+        content=f"内部错误: {exc}",
+        status_code=500,
         media_type="text/plain",
     )
 
