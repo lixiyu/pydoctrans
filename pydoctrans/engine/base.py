@@ -37,9 +37,9 @@ class Engine(ABC):
             def name(self) -> str:
                 return "my-engine"
 
-            def convert(self, data, file_name, format, timeout=None):
+            def convert(self, data, file_name, to, timeout=None):
                 ...
-                return ConversionResult(data=..., engine=self.name, format=format)
+                return ConversionResult(data=..., engine=self.name, to=to)
 
             def health(self) -> dict:
                 return {"status": "ok"}
@@ -64,7 +64,7 @@ class Engine(ABC):
         Args:
             data: 源文件内容。
             file_name: 源文件名（含扩展名，如 "report.docx"）。
-            format: 目标格式（如 "pdf"、"odt"）。
+            to: 目标格式（如 "pdf"、"odt"）。
             timeout: 单次转换超时秒数。
 
         Returns:

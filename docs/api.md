@@ -14,7 +14,7 @@ pdf = convert(data, to="pdf", *, file_name="input.bin", timeout=None,
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `data` | `bytes` | *必填* | 源文件内容 |
-| `format` | `str` | *必填* | 目标格式（`pdf`、`odt`、`docx` 等） |
+| `to` | `str` | *必填* | 目标格式（`pdf`、`odt`、`docx` 等） |
 | `file_name` | `str` | `"input.bin"` | 源文件名（含扩展名，LO 据此识别类型） |
 | `timeout` | `int` | `None` | 超时秒数，`None` 使用默认值（300s） |
 | `before` | `list[BeforeHook]` | `None` | 转换前钩子 |
@@ -45,7 +45,7 @@ from pydoctrans import ConversionContext
 |------|------|------|
 | `data` | `bytes` | 文件内容（before 阶段为源文件，after 阶段为输出） |
 | `file_name` | `str` | 源文件名 |
-| `format` | `str` | 目标格式 |
+| `to` | `str` | 目标格式 |
 | `engine` | `str` | 引擎名称 |
 | `meta` | `dict` | 自由读写字典，钩子间传递状态 |
 
