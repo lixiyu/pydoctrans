@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from prometheus_client import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -175,6 +175,9 @@ app = FastAPI(
 )
 
 app.add_middleware(ShutdownMiddleware)
+
+# v1 API 路由器
+v1 = APIRouter(prefix="/api/v1")
 
 
 # ---- Exception handlers ----
@@ -348,14 +351,14 @@ def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
         f"URL 下载失败（已重试 {DOWNLOAD_RETRIES} 次）: {url} — {last_error}"
     )
 
-@app.get("/health")
+@v1.get("/health")
 async def health() -> dict:
     """服务健康检查。"""
     engine = _get_engine()
     return engine.health()
 
 
-@app.get("/engines")
+@v1.get("/engines")
 async def list_engines() -> dict:
     """列出所有可用引擎及其状态。"""
     engine = _get_engine()
@@ -370,7 +373,7 @@ async def list_engines() -> dict:
     }
 
 
-@app.get("/metrics")
+@v1.get("/metrics")
 async def metrics() -> Response:
     """Prometheus 指标端点。"""
     return Response(
@@ -379,7 +382,7 @@ async def metrics() -> Response:
     )
 
 
-@app.post("/convert")
+@v1.post("/convert")
 async def convert(
     file: UploadFile = File(...),
     to_: str = Form(default="pdf", alias="to"),
@@ -450,7 +453,7 @@ async def convert(
     )
 
 
-@app.post("/convert/url")
+@v1.post("/convert/url")
 async def convert_url(
     url: str = Form(...),
     to_: str = Form(default="pdf", alias="to"),
@@ -519,4 +522,17 @@ async def convert_url(
         )
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ---- 路由注册 ----
+
+# v1 API（版本化路径）
+app.include_router(v1)
+
+# 向后兼容：旧路径（deprecated，v2 移除）
+app.get("/health")(health)
+app.get("/engines")(list_engines)
+app.get("/metrics")(metrics)
+app.post("/convert")(convert)
+app.post("/convert/url")(convert_url)
 
