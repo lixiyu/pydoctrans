@@ -215,20 +215,58 @@ DOWNLOAD_RETRY_BASE_DELAY = float(os.environ.get("DOWNLOAD_RETRY_BASE_DELAY", "1
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
 
 
-def _url_basename(url: str) -> str:
-    """从 URL 中提取文件名，无法提取时返回 download_{uuid}。"""
-    from urllib.parse import urlparse
+_CONTENT_TYPE_TO_EXT: dict[str, str] = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "application/msword": "doc",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.oasis.opendocument.text": "odt",
+    "application/vnd.oasis.opendocument.spreadsheet": "ods",
+    "application/vnd.oasis.opendocument.presentation": "odp",
+    "text/plain": "txt",
+    "text/html": "html",
+    "text/csv": "csv",
+    "text/markdown": "md",
+    "application/pdf": "pdf",
+    "application/rtf": "rtf",
+}
 
-    path = urlparse(url).path
+
+def _infer_filename(url: str, headers: dict[str, str], content_type: str | None) -> str:
+    """从 HTTP 响应中推断合理的文件名。
+
+    优先级：Content-Disposition > URL path > Content-Type > 随机名
+    """
+    import cgi
+
+    # 1. Content-Disposition: attachment; filename="report.docx"
+    cd = headers.get("Content-Disposition", "")
+    if cd:
+        _, params = cgi.parse_header(cd)
+        fname = params.get("filename", "")
+        if fname and "." in fname:
+            return fname
+
+    # 2. URL path
+    path = urllib.parse.urlparse(url).path
     name = Path(path).name
     if name and "." in name:
         return name
-    return f"download_{uuid.uuid4().hex[:8]}"
+
+    # 3. Content-Type → 推测扩展名
+    if content_type:
+        ext = _CONTENT_TYPE_TO_EXT.get(content_type.split(";")[0].strip().lower())
+        if ext:
+            return f"download.{ext}"
+
+    # 4. fallback
+    return f"download_{uuid.uuid4().hex[:8]}.bin"
 
 
 def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
-    """下载 URL 内容到临时目录，支持重试。返回 (文件名, 内容)。"""
-    file_name = _url_basename(url)
+    """下载 URL 内容到临时目录，支持指数退避重试。返回 (文件名, 内容)。"""
     last_error: Optional[Exception] = None
 
     for attempt in range(1, DOWNLOAD_RETRIES + 1):
@@ -239,13 +277,16 @@ def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
             )
             with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
                 content = resp.read()
+                headers = dict(resp.headers.items())
+                content_type = resp.headers.get_content_type()
                 content_length = resp.headers.get("Content-Length")
                 if content_length and len(content) != int(content_length):
                     raise IOError(
                         f"下载不完整：预期 {content_length} 字节，收到 {len(content)} 字节"
                     )
-            logger.info("URL 下载成功: %s (%d bytes, attempt %d/%d)",
-                        url, len(content), attempt, DOWNLOAD_RETRIES)
+            file_name = _infer_filename(url, headers, content_type)
+            logger.info("URL 下载成功: %s → %s (%d bytes, attempt %d/%d)",
+                        url, file_name, len(content), attempt, DOWNLOAD_RETRIES)
             return file_name, content
         except Exception as e:
             last_error = e
@@ -329,12 +370,15 @@ async def convert(
                 timeout=timeout,
             )
         except ValueError as e:
+            logger.error("转换参数错误: %s — %s", file.filename, e)
             requests_total.labels(status="400", format=format).inc()
             raise HTTPException(status_code=400, detail=str(e)) from e
         except ConversionError as e:
+            logger.error("转换失败: %s → %s — %s", file.filename, format, e)
             requests_total.labels(status="400", format=format).inc()
             raise HTTPException(status_code=400, detail=str(e)) from e
         except TimeoutError as e:
+            logger.error("转换超时: %s → %s — %s", file.filename, format, e)
             requests_total.labels(status="504", format=format).inc()
             raise HTTPException(status_code=504, detail=str(e)) from e
 
@@ -368,10 +412,12 @@ async def convert_url(
         try:
             file_name, file_data = _download_with_retries(url, tmpdir)
         except IOError as e:
+            logger.error("URL 下载最终失败: %s — %s", url, e)
             requests_total.labels(status="502", format=format).inc()
             raise HTTPException(status_code=502, detail=str(e)) from e
 
         file_len = len(file_data)
+        logger.info("URL 转换开始: %s → %s (%d bytes, file=%s)", url, format, file_len, file_name)
 
         if file_len > MAX_FILE_SIZE:
             requests_total.labels(status="413", format=format).inc()
@@ -391,12 +437,15 @@ async def convert_url(
                     timeout=timeout,
                 )
             except ValueError as e:
+                logger.error("URL 转换参数错误: %s — %s", url, e)
                 requests_total.labels(status="400", format=format).inc()
                 raise HTTPException(status_code=400, detail=str(e)) from e
             except ConversionError as e:
+                logger.error("URL 转换失败: %s → %s — %s", url, format, e)
                 requests_total.labels(status="400", format=format).inc()
                 raise HTTPException(status_code=400, detail=str(e)) from e
             except TimeoutError as e:
+                logger.error("URL 转换超时: %s → %s — %s", url, format, e)
                 requests_total.labels(status="504", format=format).inc()
                 raise HTTPException(status_code=504, detail=str(e)) from e
 
