@@ -344,7 +344,7 @@ async def metrics() -> Response:
 @app.post("/convert")
 async def convert(
     file: UploadFile = File(...),
-    format: str = Form(default="pdf"),
+    to_: str = Form(default="pdf", alias="to"),
     from_: str | None = Form(default=None, alias="from"),
     timeout: Optional[int] = Form(default=None),
 ) -> Response:
@@ -352,7 +352,7 @@ async def convert(
 
     Args:
         file: 源文件（multipart 上传）。
-        format: 目标格式（如 pdf），默认 pdf。
+        to_: 目标格式（如 pdf），默认 pdf。
         from_: 源格式（如 docx），未指定则从文件名自动推断。
         timeout: 可选，本次转换的超时秒数。
     """
@@ -362,14 +362,14 @@ async def convert(
 
     # 文件大小检查
     if file_len > MAX_FILE_SIZE:
-        requests_total.labels(status="413", format=format).inc()
+        requests_total.labels(status="413", format=to_).inc()
         raise HTTPException(
             status_code=413,
             detail=f"文件大小超过限制（{MAX_FILE_SIZE} 字节）",
         )
 
     if not file.filename:
-        requests_total.labels(status="400", format=format).inc()
+        requests_total.labels(status="400", format=to_).inc()
         raise HTTPException(
             status_code=400,
             detail="缺少文件名",
@@ -379,32 +379,32 @@ async def convert(
 
     engine = _get_engine()
 
-    with _track_request(format=format, file_size=file_len):
+    with _track_request(format=to_, file_size=file_len):
         try:
             result = engine.convert(
                 data=file_data,
                 file_name=file_name,
-                format=format,
+                format=to_,
                 timeout=timeout,
             )
         except ValueError as e:
             logger.error("转换参数错误: %s — %s", file.filename, e)
-            requests_total.labels(status="400", format=format).inc()
+            requests_total.labels(status="400", format=to_).inc()
             raise HTTPException(status_code=400, detail=str(e)) from e
         except ConversionError as e:
-            logger.error("转换失败: %s → %s — %s", file.filename, format, e)
-            requests_total.labels(status="400", format=format).inc()
+            logger.error("转换失败: %s → %s — %s", file.filename, to_, e)
+            requests_total.labels(status="400", format=to_).inc()
             raise HTTPException(status_code=400, detail=str(e)) from e
         except TimeoutError as e:
-            logger.error("转换超时: %s → %s — %s", file.filename, format, e)
-            requests_total.labels(status="504", format=format).inc()
+            logger.error("转换超时: %s → %s — %s", file.filename, to_, e)
+            requests_total.labels(status="504", format=to_).inc()
             raise HTTPException(status_code=504, detail=str(e)) from e
 
-    requests_total.labels(status="200", format=format).inc()
+    requests_total.labels(status="200", format=to_).inc()
 
     # 构造输出文件名
     stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
-    output_filename = f"{stem}.{format}"
+    output_filename = f"{stem}.{to_}"
 
     return _attachment_response(
         result.data, output_filename, result.engine,
@@ -415,7 +415,7 @@ async def convert(
 @app.post("/convert/url")
 async def convert_url(
     url: str = Form(...),
-    format: str = Form(default="pdf"),
+    to_: str = Form(default="pdf", alias="to"),
     from_: str | None = Form(default=None, alias="from"),
     timeout: Optional[int] = Form(default=None),
 ) -> Response:
@@ -423,7 +423,8 @@ async def convert_url(
 
     Args:
         url: 源文件下载地址。
-        format: 目标格式，如 "pdf"、"odt"、"docx"。
+        to_: 目标格式，如 pdf、odt、docx，默认 pdf。
+        from_: 源格式，如 docx，未指定则从 Content-Type/URL 推断。
         timeout: 可选，本次转换的超时秒数。
     """
     tmpdir = tempfile.mkdtemp(prefix="pydoctrans_url_", dir=TMP_DIR)
@@ -432,15 +433,15 @@ async def convert_url(
             file_name, file_data = _download_with_retries(url, tmpdir)
         except IOError as e:
             logger.error("URL 下载最终失败: %s — %s", url, e)
-            requests_total.labels(status="502", format=format).inc()
+            requests_total.labels(status="502", format=to_).inc()
             raise HTTPException(status_code=502, detail=str(e)) from e
 
         file_name = _apply_from_format(file_name, from_)
         file_len = len(file_data)
-        logger.info("URL 转换开始: %s → %s (%d bytes, file=%s)", url, format, file_len, file_name)
+        logger.info("URL 转换开始: %s → %s (%d bytes, file=%s)", url, to_, file_len, file_name)
 
         if file_len > MAX_FILE_SIZE:
-            requests_total.labels(status="413", format=format).inc()
+            requests_total.labels(status="413", format=to_).inc()
             raise HTTPException(
                 status_code=413,
                 detail=f"文件大小超过限制（{MAX_FILE_SIZE} 字节）",
@@ -448,31 +449,31 @@ async def convert_url(
 
         engine = _get_engine()
 
-        with _track_request(format=format, file_size=file_len):
+        with _track_request(format=to_, file_size=file_len):
             try:
                 result = engine.convert(
                     data=file_data,
                     file_name=file_name,
-                    format=format,
+                    format=to_,
                     timeout=timeout,
                 )
             except ValueError as e:
                 logger.error("URL 转换参数错误: %s — %s", url, e)
-                requests_total.labels(status="400", format=format).inc()
+                requests_total.labels(status="400", format=to_).inc()
                 raise HTTPException(status_code=400, detail=str(e)) from e
             except ConversionError as e:
-                logger.error("URL 转换失败: %s → %s — %s", url, format, e)
-                requests_total.labels(status="400", format=format).inc()
+                logger.error("URL 转换失败: %s → %s — %s", url, to_, e)
+                requests_total.labels(status="400", format=to_).inc()
                 raise HTTPException(status_code=400, detail=str(e)) from e
             except TimeoutError as e:
-                logger.error("URL 转换超时: %s → %s — %s", url, format, e)
-                requests_total.labels(status="504", format=format).inc()
+                logger.error("URL 转换超时: %s → %s — %s", url, to_, e)
+                requests_total.labels(status="504", format=to_).inc()
                 raise HTTPException(status_code=504, detail=str(e)) from e
 
-        requests_total.labels(status="200", format=format).inc()
+        requests_total.labels(status="200", format=to_).inc()
 
         stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
-        output_filename = f"{stem}.{format}"
+        output_filename = f"{stem}.{to_}"
 
         return _attachment_response(
             result.data, output_filename, result.engine,
