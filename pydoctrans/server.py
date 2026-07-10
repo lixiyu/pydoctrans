@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # ---- 配置 ----
 MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "50"))
 MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
-GRACE_PERIOD = int(os.environ.get("GRACE_PERIOD", "30"))  # 优雅关闭等待秒数
+GRACE_PERIOD = int(os.environ.get("GRACE_PERIOD", "30"))  # 优雅关闭最长等待秒数
 TMP_DIR = os.environ.get("TMP_DIR", "/tmp")
 
 # ---- 全局状态 ----
