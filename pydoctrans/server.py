@@ -236,12 +236,29 @@ DOWNLOAD_RETRY_BASE_DELAY = float(os.environ.get("DOWNLOAD_RETRY_BASE_DELAY", "1
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
 
 
-def _apply_from_format(file_name: str, from_format: str | None) -> str:
-    """如果指定了源格式，重命名文件使其带有正确的扩展名。"""
-    if from_format is None:
+def _apply_from_format(file_name: str, from_format: str | None, data: bytes) -> str:
+    """确保文件名带有正确的扩展名。
+
+    优先级：手动指定 → 文件名自带 → 魔术字节检测 → 不改
+    """
+    # 1. 手动指定了 from 格式
+    if from_format is not None:
+        stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+        return f"{stem}.{from_format}"
+
+    # 2. 文件名已有扩展名
+    if "." in file_name:
         return file_name
-    stem = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
-    return f"{stem}.{from_format}"
+
+    # 3. 从文件内容自动检测
+    from pydoctrans.filetype import detect
+
+    ext = detect(data)
+    if ext:
+        logger.info("文件类型自动检测: %s → .%s", file_name, ext)
+        return f"{file_name}.{ext}"
+
+    return file_name
 
 
 _CONTENT_TYPE_TO_EXT: dict[str, str] = {
@@ -396,7 +413,7 @@ async def convert(
             detail="缺少文件名",
         )
 
-    file_name = _apply_from_format(file.filename, from_)
+    file_name = _apply_from_format(file.filename, from_, file_data)
 
     engine = _get_engine()
 
@@ -457,7 +474,7 @@ async def convert_url(
             requests_total.labels(status="502", to=to_).inc()
             raise HTTPException(status_code=502, detail=str(e)) from e
 
-        file_name = _apply_from_format(file_name, from_)
+        file_name = _apply_from_format(file_name, from_, file_data)
         file_len = len(file_data)
         logger.info("URL 转换开始: %s → %s (%d bytes, file=%s)", url, to_, file_len, file_name)
 
