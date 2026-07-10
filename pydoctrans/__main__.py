@@ -178,11 +178,8 @@ def main() -> None:
     elif args.command == "serve":
         _cmd_serve(args)
     else:
-        # 无子命令时默认启动服务
-        # 保留 --host/--port/--log-level 兼容旧用法
-        serve_parser.set_defaults(command="serve")
-        args = parser.parse_args()
-        _cmd_serve(args)
+        # 无子命令时默认启动服务，使用 serve 子解析器的默认值
+        _cmd_serve(serve_parser.parse_args([]))
 
 
 if __name__ == "__main__":

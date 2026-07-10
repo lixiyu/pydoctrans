@@ -11,7 +11,6 @@
 #   docker run -p 8000:8000 \
 #     -e MAX_CONCURRENT=4 \
 #     -e LO_TIMEOUT=120 \
-#     -e MAX_FILE_SIZE=104857600 \
 #     pydoctrans
 
 FROM ubuntu:22.04
@@ -19,16 +18,12 @@ FROM ubuntu:22.04
 # 系统包
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    # LibreOffice 依赖
-    libx11-6 \
-    libxext6 \
-    libxrender1 \
-    libxinerama1 \
-    libcairo2 \
-    libcups2 \
-    libdbus-glib-1-2 \
-    libglib2.0-0 \
-    libsm6 \
+    # LibreOffice headless 运行时依赖
+    libx11-6 libxext6 libxrender1 libxinerama1 \
+    libx11-xcb1 libxcb1 libxcb-shm0 libxcb-render0 \
+    libcairo2 libcups2 libdbus-glib-1-2 libglib2.0-0 libsm6 \
+    libssl3 libnss3 libnspr4 \
+    libfontconfig1 libfreetype6 \
     # 工具
     wget \
     ca-certificates \
@@ -62,7 +57,7 @@ RUN pip3 install --no-cache-dir -e . && \
 RUN python3 -c "from pydoctrans.env import detect; \
     env = detect(); \
     assert env.found, 'LO not found'; \
-    print(f'LO detected: {env.version}')"
+    print(f'LO version: {env.version[:80]}')"
 
 EXPOSE 8000
 
