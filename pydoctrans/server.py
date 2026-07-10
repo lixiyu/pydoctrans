@@ -210,7 +210,8 @@ def _attachment_response(data: bytes, filename: str, engine: str, elapsed_s: flo
             "X-Elapsed": str(elapsed_s),
         },
     )
-DOWNLOAD_RETRY_DELAY = float(os.environ.get("DOWNLOAD_RETRY_DELAY", "1.0"))
+DOWNLOAD_RETRIES = int(os.environ.get("DOWNLOAD_RETRIES", "3"))
+DOWNLOAD_RETRY_BASE_DELAY = float(os.environ.get("DOWNLOAD_RETRY_BASE_DELAY", "1.0"))
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
 
 
@@ -238,7 +239,6 @@ def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
             )
             with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
                 content = resp.read()
-                # 检查 Content-Length（如果声明了）
                 content_length = resp.headers.get("Content-Length")
                 if content_length and len(content) != int(content_length):
                     raise IOError(
@@ -250,11 +250,12 @@ def _download_with_retries(url: str, tmpdir: str) -> tuple[str, bytes]:
         except Exception as e:
             last_error = e
             if attempt < DOWNLOAD_RETRIES:
+                delay = DOWNLOAD_RETRY_BASE_DELAY * (2 ** (attempt - 1))
                 logger.warning(
-                    "URL 下载失败 (attempt %d/%d): %s — %s 秒后重试",
-                    attempt, DOWNLOAD_RETRIES, e, DOWNLOAD_RETRY_DELAY,
+                    "URL 下载失败 (attempt %d/%d): %s — %.1fs 后重试",
+                    attempt, DOWNLOAD_RETRIES, e, delay,
                 )
-                time.sleep(DOWNLOAD_RETRY_DELAY)
+                time.sleep(delay)
 
     raise IOError(
         f"URL 下载失败（已重试 {DOWNLOAD_RETRIES} 次）: {url} — {last_error}"
