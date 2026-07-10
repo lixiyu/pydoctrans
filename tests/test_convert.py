@@ -13,21 +13,21 @@ class TestConvertFunction:
     """测试 convert() 公共 API。"""
 
     def test_returns_bytes(self) -> None:
-        result = convert(b"hello", format="pdf", file_name="test.txt")
+        result = convert(b"hello", to="pdf", file_name="test.txt")
         assert isinstance(result, bytes)
         assert len(result) > 0
 
     def test_raises_on_invalid_format(self) -> None:
         with pytest.raises(ConversionError):
-            convert(b"data", format="zzz_invalid", file_name="test.txt", timeout=30)
+            convert(b"data", to="zzz_invalid", file_name="test.txt", timeout=30)
 
     def test_raises_on_missing_extension(self) -> None:
         with pytest.raises(ValueError, match="须包含扩展名"):
-            convert(b"data", format="pdf", file_name="noext")
+            convert(b"data", to="pdf", file_name="noext")
 
     def test_default_file_name(self) -> None:
         """无 file_name 时使用默认值 input.bin。"""
-        result = convert(b"content", format="pdf")
+        result = convert(b"content", to="pdf")
         assert len(result) > 0
 
 
@@ -61,7 +61,7 @@ class TestCliConvert:
 
         result = subprocess.run(
             [sys.executable, "-m", "pydoctrans", "convert",
-             str(input_file), "-f", "pdf"],
+             str(input_file), "-t", "pdf"],
             capture_output=True,
             text=True,
             cwd=str(tmp_path),
@@ -75,7 +75,7 @@ class TestCliConvert:
 
         result = subprocess.run(
             [sys.executable, "-m", "pydoctrans", "convert",
-             str(tmp_path / "nonexistent.txt"), "-f", "pdf"],
+             str(tmp_path / "nonexistent.txt"), "-t", "pdf"],
             capture_output=True,
             text=True,
         )

@@ -19,17 +19,17 @@ class TestConversionContext:
         ctx = ConversionContext(
             data=b"hello",
             file_name="test.txt",
-            format="pdf",
+            to="pdf",
             engine="libreoffice",
         )
         assert ctx.data == b"hello"
         assert ctx.file_name == "test.txt"
-        assert ctx.format == "pdf"
+        assert ctx.to == "pdf"
         assert ctx.engine == "libreoffice"
         assert ctx.meta == {}
 
     def test_meta_is_mutable(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         ctx.meta["s3_url"] = "https://..."
         assert ctx.meta["s3_url"] == "https://..."
 
@@ -38,15 +38,15 @@ class TestRunBeforeHooks:
     """测试 before 钩子执行。"""
 
     def test_empty_list_is_noop(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         run_before_hooks([], ctx)  # 不应抛异常
 
     def test_none_is_noop(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         run_before_hooks(None, ctx)
 
     def test_runs_hooks_in_order(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         order: list[str] = []
 
         def a(c: ConversionContext) -> None:
@@ -59,7 +59,7 @@ class TestRunBeforeHooks:
         assert order == ["a", "b"]
 
     def test_hook_can_modify_data(self) -> None:
-        ctx = ConversionContext(data=b"orig", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"orig", file_name="f", to="pdf", engine="lo")
 
         def prepend_header(c: ConversionContext) -> None:
             c.data = b"HEADER\n" + c.data
@@ -68,7 +68,7 @@ class TestRunBeforeHooks:
         assert ctx.data == b"HEADER\norig"
 
     def test_hook_can_modify_file_name(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="bad name.docx", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="bad name.docx", to="pdf", engine="lo")
 
         def sanitize(c: ConversionContext) -> None:
             c.file_name = c.file_name.replace(" ", "_")
@@ -77,7 +77,7 @@ class TestRunBeforeHooks:
         assert ctx.file_name == "bad_name.docx"
 
     def test_hook_exception_aborts_conversion(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
 
         def reject_large(c: ConversionContext) -> None:
             if len(c.data) > 100:
@@ -96,7 +96,7 @@ class TestRunAfterHooks:
     """测试 after 钩子执行。"""
 
     def test_runs_in_order(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         order: list[str] = []
 
         def a(c: ConversionContext) -> None:
@@ -109,7 +109,7 @@ class TestRunAfterHooks:
         assert order == ["a", "b"]
 
     def test_hook_can_modify_data(self) -> None:
-        ctx = ConversionContext(data=b"pdf_data", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"pdf_data", file_name="f", to="pdf", engine="lo")
 
         def watermark(c: ConversionContext) -> None:
             c.data = c.data + b" [watermarked]"
@@ -118,7 +118,7 @@ class TestRunAfterHooks:
         assert ctx.data == b"pdf_data [watermarked]"
 
     def test_hook_can_write_meta(self) -> None:
-        ctx = ConversionContext(data=b"pdf", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"pdf", file_name="f", to="pdf", engine="lo")
 
         def upload(c: ConversionContext) -> None:
             c.meta["upload_url"] = "https://s3/result.pdf"
@@ -127,7 +127,7 @@ class TestRunAfterHooks:
         assert ctx.meta["upload_url"] == "https://s3/result.pdf"
 
     def test_one_failure_does_not_block_others(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
         results: list[str] = []
 
         def succeed_1(c: ConversionContext) -> None:
@@ -147,7 +147,7 @@ class TestRunAfterHooks:
         assert exc_info.value.errors[0][0] == "fail"
 
     def test_multiple_failures_aggregated(self) -> None:
-        ctx = ConversionContext(data=b"x", file_name="f", format="pdf", engine="lo")
+        ctx = ConversionContext(data=b"x", file_name="f", to="pdf", engine="lo")
 
         def f1(c: ConversionContext) -> None:
             raise RuntimeError("e1")
@@ -173,7 +173,7 @@ class TestConvertWithHooks:
 
         result = convert(
             b"hello",
-            format="pdf",
+            to="pdf",
             file_name="test.txt",
             before=[tracker],
         )
@@ -189,7 +189,7 @@ class TestConvertWithHooks:
 
         result = convert(
             b"hello",
-            format="pdf",
+            to="pdf",
             file_name="test.txt",
             after=[tracker],
         )
@@ -203,7 +203,7 @@ class TestConvertWithHooks:
         with pytest.raises(ValueError, match="rejected"):
             convert(
                 b"hello",
-                format="pdf",
+                to="pdf",
                 file_name="test.txt",
                 before=[reject],
             )
@@ -214,7 +214,7 @@ class TestConvertWithHooks:
 
         result = convert(
             b"hello",
-            format="pdf",
+            to="pdf",
             file_name="test.txt",
             after=[append_text],
         )
@@ -225,11 +225,11 @@ class TestConvertWithHooks:
 
         def record(c: ConversionContext) -> None:
             meta_store["size"] = len(c.data)
-            c.meta["format"] = c.format
+            c.meta["to"] = c.to
 
         convert(
             b"hello",
-            format="pdf",
+            to="pdf",
             file_name="test.txt",
             after=[record],
         )

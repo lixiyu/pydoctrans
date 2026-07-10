@@ -4,7 +4,7 @@
 
     # 直接转换文档
     python -m pydoctrans convert input.docx output.pdf
-    python -m pydoctrans convert input.docx -f pdf -o result
+    python -m pydoctrans convert input.docx -t pdf -o result
 
     # 启动 HTTP 服务
     python -m pydoctrans serve
@@ -60,20 +60,20 @@ def _cmd_convert(args: argparse.Namespace) -> None:
     else:
         output_path = None
 
-    format = args.format
-    if format is None and output_path is not None:
+    to = args.to
+    if to is None and output_path is not None:
         # 从输出文件扩展名推断格式
-        format = output_path.suffix.lstrip(".")
-    if format is None:
-        print("错误: 请通过 -f <格式> 或输出文件扩展名指定目标格式", file=sys.stderr)
+        to = output_path.suffix.lstrip(".")
+    if to is None:
+        print("错误: 请通过 -t <格式> 或输出文件扩展名指定目标格式", file=sys.stderr)
         sys.exit(1)
 
     # 执行转换
-    print(f"转换中: {input_path} → {format} ...")
+    print(f"转换中: {input_path} → {to} ...")
     try:
         result = convert(
             data=data,
-            format=format,
+            to=to,
             file_name=file_name,
             timeout=args.timeout,
         )
@@ -88,7 +88,7 @@ def _cmd_convert(args: argparse.Namespace) -> None:
     if output_path is None:
         # 默认输出文件名：源文件名 + 目标扩展名
         stem = input_path.stem
-        output_path = Path.cwd() / f"{stem}.{format}"
+        output_path = Path.cwd() / f"{stem}.{to}"
 
     output_path.write_bytes(result)
     size = len(result)
@@ -131,7 +131,7 @@ def main() -> None:
         help="输出文件路径（默认: <输入文件名>.<格式>）",
     )
     convert_parser.add_argument(
-        "-f", "--format",
+        "-t", "--to",
         default=None,
         help="目标格式（如 pdf、odt、docx）。未指定则从输出文件扩展名推断",
     )

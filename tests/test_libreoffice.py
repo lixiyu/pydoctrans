@@ -57,7 +57,7 @@ class TestLibreOfficeEngine:
             timeout=30,
         )
         assert len(result.data) > 0
-        assert result.format == "pdf"
+        assert result.to == "pdf"
         assert result.engine == "libreoffice"
         assert result.meta["elapsed_s"] > 0
 

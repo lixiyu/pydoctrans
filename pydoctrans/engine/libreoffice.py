@@ -69,7 +69,7 @@ class LibreOfficeEngine(Engine):
         self,
         data: bytes,
         file_name: str,
-        format: str,
+        to: str,
         timeout: int | None = None,
     ) -> ConversionResult:
         """将文档转换为目标格式。
@@ -77,7 +77,7 @@ class LibreOfficeEngine(Engine):
         Args:
             data: 源文档内容。
             file_name: 源文件名（含扩展名）。
-            format: 目标格式，如 "pdf"、"odt"、"docx"。
+            to: 目标格式，如 "pdf"、"odt"、"docx"。
             timeout: 超时秒数，默认 300。
 
         Returns:
@@ -101,7 +101,7 @@ class LibreOfficeEngine(Engine):
             with pool.acquire(timeout=timeout):
                 with Sandbox(str(self._env_info.program_dir)) as sandbox:
                     result_data = self._do_convert(
-                        sandbox, data, file_name, format, timeout,
+                        sandbox, data, file_name, to, timeout,
                     )
         except RuntimeError as e:
             raise ConversionError(str(e), engine=self.name) from e
@@ -110,7 +110,7 @@ class LibreOfficeEngine(Engine):
         return ConversionResult(
             data=result_data,
             engine=self.name,
-            format=format,
+            to=to,
             meta={
                 "elapsed_s": round(elapsed, 2),
                 "lo_version": self._env_info.version,
@@ -136,7 +136,7 @@ class LibreOfficeEngine(Engine):
         sandbox: Sandbox,
         data: bytes,
         file_name: str,
-        format: str,
+        to: str,
         timeout: int,
     ) -> bytes:
         """在沙箱中执行 LO 转换。"""
@@ -151,7 +151,7 @@ class LibreOfficeEngine(Engine):
             self._env_info.executable,
             "--headless",
             "--convert-to",
-            format,
+            to,
             "--outdir",
             str(home),
             str(input_path),
@@ -169,7 +169,7 @@ class LibreOfficeEngine(Engine):
                 cwd=sandbox.home,
             )
         except subprocess.TimeoutExpired as e:
-            logger.error("LO 转换超时: %s → %s (%.0fs)", file_name, format, timeout)
+            logger.error("LO 转换超时: %s → %s (%.0fs)", file_name, to, timeout)
             raise TimeoutError(
                 f"LibreOffice 转换超时（{timeout}s）: {file_name}"
             ) from e
@@ -187,7 +187,7 @@ class LibreOfficeEngine(Engine):
             )
 
         # 定位输出文件
-        output_path = self._find_output(home, file_name, format)
+        output_path = self._find_output(home, file_name, to)
         if output_path is None or not output_path.exists():
             available = [p.name for p in home.glob("*")]
             raise ConversionError(
@@ -198,7 +198,7 @@ class LibreOfficeEngine(Engine):
         return output_path.read_bytes()
 
     @staticmethod
-    def _find_output(home: Path, file_name: str, format: str) -> Path | None:
+    def _find_output(home: Path, file_name: str, to: str) -> Path | None:
         """查找 LO 生成的输出文件。
 
         LO 的输出文件名规则：去掉原名扩展名，加上目标扩展名。
@@ -209,12 +209,12 @@ class LibreOfficeEngine(Engine):
         """
         stem = Path(file_name).stem
         # 策略 1：直接匹配
-        expected = home / f"{stem}.{format}"
+        expected = home / f"{stem}.{to}"
         if expected.exists():
             return expected
         # 策略 2：通配匹配（处理 LO 的文件名变体）
         candidates = sorted(
-            home.glob(f"{stem}*.{format}"),
+            home.glob(f"{stem}*.{to}"),
             key=lambda p: len(p.name),  # 最短的名字最可能是目标
         )
         if candidates:

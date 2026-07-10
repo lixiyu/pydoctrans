@@ -11,13 +11,13 @@ from prometheus_client import Counter, Gauge, Histogram
 requests_total = Counter(
     "pydoctrans_requests_total",
     "转换请求总数",
-    ["status", "format"],
+    ["status", "to"],
 )
 
 request_duration_seconds = Histogram(
     "pydoctrans_request_duration_seconds",
     "转换请求耗时（秒）",
-    ["format"],
+    ["to"],
     buckets=[1, 5, 10, 30, 60, 120, 300],
 )
 

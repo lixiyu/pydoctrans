@@ -25,7 +25,7 @@ class ConversionContext:
     file_name: str
     """源文件名（如 \"report.docx\"）。钩子可以修改。"""
 
-    format: str
+    to: str
     """目标格式（如 \"pdf\"）。"""
 
     engine: str

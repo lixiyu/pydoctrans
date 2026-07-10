@@ -20,7 +20,7 @@ class ConversionResult:
     engine: str
     """执行转换的引擎名称。"""
 
-    format: str
+    to: str
     """输出格式。"""
 
     meta: dict[str, Any] = field(default_factory=dict)
@@ -56,7 +56,7 @@ class Engine(ABC):
         self,
         data: bytes,
         file_name: str,
-        format: str,
+        to: str,
         timeout: int | None = None,
     ) -> ConversionResult:
         """将源文件转换为目标格式。

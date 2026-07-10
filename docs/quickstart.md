@@ -37,7 +37,7 @@ python -m pydoctrans serve --port 8000
 ```
 
 ```bash
-curl -F "file=@report.docx" -F "format=pdf" http://localhost:8000/convert -o report.pdf
+curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/convert -o report.pdf
 ```
 
 ## Docker

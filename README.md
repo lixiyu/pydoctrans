@@ -71,7 +71,7 @@ GET  /metrics   — Prometheus 指标
 ```
 
 ```bash
-curl -F "file=@report.docx" -F "format=pdf" http://localhost:8000/convert -o report.pdf
+curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/convert -o report.pdf
 ```
 
 ### Docker

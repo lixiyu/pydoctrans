@@ -24,7 +24,7 @@ __all__ = ["convert", "ConversionError", "ConversionContext", "BeforeHook", "Aft
 
 def convert(
     data: bytes,
-    format: str,
+    to: str,
     *,
     file_name: str = "input.bin",
     timeout: int | None = None,
@@ -35,7 +35,7 @@ def convert(
 
     Args:
         data: 源文档内容。
-        format: 目标格式，如 ``"pdf"``。
+        to: 目标格式，如 ``"pdf"``。
         file_name: 源文件名（含扩展名，用于 LO 识别文件类型）。
         timeout: 超时秒数，None 使用默认值（300s）。
         before: 转换前钩子列表。可修改 data/file_name，抛异常可中止转换。
@@ -55,19 +55,19 @@ def convert(
 
         # 基本用法
         with open("report.docx", "rb") as f:
-            pdf_bytes = convert(f.read(), format="pdf", file_name="report.docx")
+            pdf_bytes = convert(f.read(), to="pdf", file_name="report.docx")
 
         # 带钩子
         def log_size(ctx):
             print(f"输出文件大小: {len(ctx.data)} 字节")
 
-        pdf = convert(docx, format="pdf", file_name="r.docx", after=[log_size])
+        pdf = convert(docx, to="pdf", file_name="r.docx", after=[log_size])
     """
     # 1. Run before hooks
     ctx = ConversionContext(
         data=data,
         file_name=file_name,
-        format=format,
+        to=to,
         engine="libreoffice",
     )
     run_before_hooks(before, ctx)
@@ -77,7 +77,7 @@ def convert(
     result = engine.convert(
         data=ctx.data,
         file_name=ctx.file_name,
-        format=format,
+        to=to,
         timeout=timeout,
     )
     ctx.data = result.data
