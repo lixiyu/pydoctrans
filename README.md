@@ -72,7 +72,7 @@ with open("report.pdf", "wb") as f:
 python -m pydoctrans convert input.docx output.pdf
 
 # 指定格式（自动生成输出文件名）
-python -m pydoctrans convert input.docx -f pdf
+python -m pydoctrans convert input.docx -t pdf
 
 # 启动 HTTP 服务
 python -m pydoctrans serve --port 8000
