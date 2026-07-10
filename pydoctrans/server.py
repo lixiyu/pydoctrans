@@ -526,13 +526,5 @@ async def convert_url(
 
 # ---- 路由注册 ----
 
-# v1 API（版本化路径）
 app.include_router(v1)
-
-# 向后兼容：旧路径（deprecated，v2 移除）
-app.get("/health")(health)
-app.get("/engines")(list_engines)
-app.get("/metrics")(metrics)
-app.post("/convert")(convert)
-app.post("/convert/url")(convert_url)
 
