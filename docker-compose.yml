@@ -1,0 +1,15 @@
+services:
+  pydoctrans:
+    build: .
+    image: pydoctrans:latest
+    container_name: pydoctrans
+    ports:
+      - "8766:8000"
+    environment:
+      - MAX_CONCURRENT=10
+      - LO_TIMEOUT=300
+      - MAX_FILE_SIZE=52428800
+      - TMP_DIR=/tmp
+    restart: unless-stopped
+    tmpfs:
+      - /tmp:exec,size=2G
