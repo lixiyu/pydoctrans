@@ -15,7 +15,7 @@ from pathlib import Path
 from pydoctrans.engine.base import ConversionResult, Engine
 from pydoctrans.env import detect
 from pydoctrans.pool import ConversionPool
-from pydoctrans.sandbox import Sandbox
+from pydoctrans.sandbox import Sandbox, cleanup_orphan_sandboxes
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ class LibreOfficeEngine(Engine):
         self._env_info = detect()
         if not self._env_info.found:
             raise RuntimeError("未检测到 LibreOffice 安装")
+        cleanup_orphan_sandboxes()
 
     # ---- Engine 接口 ----
 
@@ -98,13 +99,9 @@ class LibreOfficeEngine(Engine):
 
         try:
             with pool.acquire(timeout=timeout):
-                with Sandbox() as sandbox:
+                with Sandbox(str(self._env_info.program_dir)) as sandbox:
                     result_data = self._do_convert(
-                        data=data,
-                        file_name=file_name,
-                        format=format,
-                        sandbox_home=sandbox.home,
-                        timeout=timeout,
+                        sandbox, data, file_name, format, timeout,
                     )
         except RuntimeError as e:
             raise ConversionError(str(e), engine=self.name) from e
@@ -136,14 +133,14 @@ class LibreOfficeEngine(Engine):
 
     def _do_convert(
         self,
+        sandbox: Sandbox,
         data: bytes,
         file_name: str,
         format: str,
-        sandbox_home: str,
         timeout: int,
     ) -> bytes:
         """在沙箱中执行 LO 转换。"""
-        home = Path(sandbox_home)
+        home = Path(sandbox.home)
         input_path = home / file_name
 
         # 写入源文件
@@ -160,9 +157,7 @@ class LibreOfficeEngine(Engine):
             str(input_path),
         ]
 
-        # 隔离 HOME：不同 HOME → 不同命名管道 → 可并行
-        env = os.environ.copy()
-        env["HOME"] = sandbox_home
+        env = sandbox.get_env()
 
         try:
             result = subprocess.run(
@@ -171,7 +166,7 @@ class LibreOfficeEngine(Engine):
                 text=True,
                 timeout=timeout,
                 env=env,
-                cwd=sandbox_home,
+                cwd=sandbox.home,
             )
         except subprocess.TimeoutExpired as e:
             logger.error("LO 转换超时: %s → %s (%.0fs)", file_name, format, timeout)
@@ -180,19 +175,23 @@ class LibreOfficeEngine(Engine):
             ) from e
 
         if result.returncode != 0:
-            stderr = result.stderr.strip()
-            logger.error("LO 转换失败 (rc=%d): %s", result.returncode, stderr)
+            stderr_tail = result.stderr.strip()[-1000:]
+            stdout_tail = result.stdout.strip()[-500:]
+            logger.error(
+                "LO 转换失败 (rc=%d, file=%s): stderr=%s",
+                result.returncode, file_name, stderr_tail,
+            )
             raise ConversionError(
-                f"LibreOffice 转换失败: {stderr}" if stderr else f"LibreOffice 返回退出码 {result.returncode}",
+                f"LibreOffice 转换失败 (退出码 {result.returncode})",
                 engine=self.name,
             )
 
         # 定位输出文件
         output_path = self._find_output(home, file_name, format)
         if output_path is None or not output_path.exists():
-            available = list(home.glob("*"))
+            available = [p.name for p in home.glob("*")]
             raise ConversionError(
-                f"转换后未找到输出文件。沙箱内容: {[p.name for p in available]}",
+                f"转换后未找到输出文件。沙箱内容: {available}",
                 engine=self.name,
             )
 

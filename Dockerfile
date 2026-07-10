@@ -15,7 +15,7 @@
 
 FROM ubuntu:22.04
 
-# 系统包
+# 系统包 + 字体
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     # LibreOffice headless 运行时依赖
@@ -24,20 +24,23 @@ RUN apt-get update && \
     libcairo2 libcups2 libdbus-glib-1-2 libglib2.0-0 libsm6 \
     libssl3 libnss3 libnspr4 \
     libfontconfig1 libfreetype6 \
+    # PDF 后处理
+    ghostscript \
+    # 中文字体 + 常用字体（对齐 parser 项目）
+    fonts-noto-cjk \
+    fonts-dejavu fonts-liberation fonts-noto fonts-freefont-ttf \
+    fonts-ubuntu fonts-cantarell fonts-lmodern fonts-inconsolata \
     # 工具
-    wget \
-    ca-certificates \
-    python3 \
-    python3-pip \
-    python3-venv \
+    wget ca-certificates \
+    python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 LibreOffice（从官方 deb 包）
-ARG LO_VERSION=26.2.3
-ARG LO_BASE=https://download.documentfoundation.org/libreoffice/stable
+# 安装 LibreOffice 26.2.4（parser 项目已验证的稳定版本）
+ARG LO_VERSION=26.2.4
+ARG LO_BASE=https://downloadarchive.documentfoundation.org/libreoffice/old
 ENV LO_VERSION=${LO_VERSION}
 
-RUN wget -q ${LO_BASE}/${LO_VERSION}/deb/x86_64/LibreOffice_${LO_VERSION}_Linux_x86-64_deb.tar.gz \
+RUN wget -q ${LO_BASE}/${LO_VERSION}.2/deb/x86_64/LibreOffice_${LO_VERSION}.2_Linux_x86-64_deb.tar.gz \
     -O /tmp/lo.tar.gz && \
     mkdir -p /tmp/lo && \
     tar -xzf /tmp/lo.tar.gz -C /tmp/lo && \
