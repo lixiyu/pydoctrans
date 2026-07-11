@@ -65,7 +65,7 @@ with open("report.pdf", "wb") as f:
 
 ## 纯 Python，怎么用都行
 
-整项目都是 Python 代码，零二进制依赖，模块边界干净。没有"下载个 Java 服务"、"装个 Go 二进制"这种事。
+纯 Python 实现，`pip install` 即用。内核模块边界清晰——沙箱、并发、引擎各司其职，换引擎不碰业务代码。底层对接 LibreOffice 26.2.4，沉淀二十年的格式兼容能力——Word/Excel/PPT 新旧版本、复杂排版、嵌入对象都能正确转换，不挑文件不丢格式。
 
 ```
 pydoctrans/
