@@ -43,6 +43,7 @@ MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "50"))
 MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
 GRACE_PERIOD = int(os.environ.get("GRACE_PERIOD", "0"))  # 优雅关闭最长等待秒数，默认不等待
 TMP_DIR = os.environ.get("TMP_DIR", "/tmp")
+DEFAULT_MAX_CONCURRENT = int(os.environ.get("LO_MAX_CONCURRENT", "10"))
 
 # ---- 全局状态 ----
 _engine: Optional[LibreOfficeEngine] = None
@@ -97,7 +98,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化池指标
     pool = engine_health.get("pool", {})
-    pool_slots_max.set(pool.get("max_concurrent", 10))
+    pool_slots_max.set(pool.get("max_concurrent", DEFAULT_MAX_CONCURRENT))
 
     # 启动池指标更新线程
     stop_event = threading.Event()
@@ -108,7 +109,7 @@ async def lifespan(app: FastAPI):
                 engine = _get_engine()
                 health = engine.health()
                 pool = health.get("pool", {})
-                mx = pool.get("max_concurrent", 10)
+                mx = pool.get("max_concurrent", DEFAULT_MAX_CONCURRENT)
                 av = pool.get("available", mx)
                 pool_slots_max.set(mx)
                 pool_slots_available.set(av)
