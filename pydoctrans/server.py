@@ -24,6 +24,7 @@ from fastapi.responses import Response
 from prometheus_client import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 
+import pydoctrans
 from pydoctrans.engine.libreoffice import ConversionError, LibreOfficeEngine
 from pydoctrans.metrics import (
     file_size_bytes,
@@ -170,7 +171,7 @@ def _track_request(format: str, file_size: int):
 app = FastAPI(
     title="pydoctrans",
     description="Python Document Transformer — HTTP API",
-    version="1.0.0",
+    version=pydoctrans.__version__,
     lifespan=lifespan,
 )
 

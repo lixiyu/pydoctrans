@@ -32,7 +32,9 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     logger = logging.getLogger("pydoctrans")
-    logger.info("pydoctrans v0.2.0 starting on %s:%s", args.host, args.port)
+    from pydoctrans import __version__
+
+    logger.info("pydoctrans v%s starting on %s:%s", __version__, args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
 
 

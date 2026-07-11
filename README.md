@@ -97,6 +97,10 @@ python -m pydoctrans convert report.docx -t pdf
 # ③ HTTP 服务 — 跨语言调用（Java/Go/Node 都能用）
 python -m pydoctrans serve --port 8000
 curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/api/v1/convert
+
+# 也可以直接给 URL，自动下载后转换
+curl -F "url=https://example.com/report.docx" -F "to=pdf" \
+     http://localhost:8000/api/v1/convert/url -o report.pdf
 ```
 
 ```yaml
