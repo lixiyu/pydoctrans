@@ -6,7 +6,7 @@ services:
     ports:
       - "8766:8000"
     environment:
-      - MAX_CONCURRENT=10
+      - LO_MAX_CONCURRENT=10
       - LO_TIMEOUT=300
       - MAX_FILE_SIZE_MB=50
       - TMP_DIR=/tmp

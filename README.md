@@ -23,7 +23,7 @@
 | 不能并行 | **HOME 目录隔离**：每次转换独立 `~/.config/libreoffice`，管道名不同，真正并行跑 |
 | 卡死没响应 | **请求级超时**：`subprocess.run(timeout)` → SIGTERM → SIGKILL → waitpid，不留僵尸 |
 | 库冲突崩溃 | **LD_LIBRARY_PATH 锁定**：LO 只加载自己 `program/` 下的 `.so`，不碰 CUDA 或系统库 |
-| OOM | **Semaphore 槽位控制**：`MAX_CONCURRENT` 限制同时在跑的 LO 进程数 |
+| OOM | **Semaphore 槽位控制**：`LO_MAX_CONCURRENT` 限制同时在跑的 LO 进程数 |
 | 一个坏文件堵全部 | **独立进程 + 超时兜底**：坏文件超时被杀，不影响其他请求 |
 | 关闭丢任务 | **优雅关闭**：SIGTERM → 拒新请求 → 等在途完成 → 清理沙箱 |
 
@@ -161,7 +161,7 @@ curl -F "file=@report.docx" -F "to=pdf" http://localhost:8000/api/v1/convert -o 
 
 ```bash
 docker build -t pydoctrans .
-docker run -p 8000:8000 -e MAX_CONCURRENT=4 -e GRACE_PERIOD=30 pydoctrans
+docker run -p 8000:8000 -e LO_MAX_CONCURRENT=4 -e GRACE_PERIOD=30 pydoctrans
 ```
 
 ## 配置
@@ -170,7 +170,7 @@ docker run -p 8000:8000 -e MAX_CONCURRENT=4 -e GRACE_PERIOD=30 pydoctrans
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `MAX_CONCURRENT` | `10` | 最大并发转换数 |
+| `LO_MAX_CONCURRENT` | `10` | 最大并发转换数 |
 | `LO_TIMEOUT` | `300` | LO 转换超时（秒） |
 | `MAX_FILE_SIZE_MB` | `50` | 上传文件大小限制（MB） |
 | `GRACE_PERIOD` | `0` | 优雅关闭最长等待（秒），0=不等待，超时强制终止 |

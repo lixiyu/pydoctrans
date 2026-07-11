@@ -19,7 +19,7 @@ class TestConversionPool:
         assert pool.max_concurrent == 3
 
     def test_max_concurrent_from_env(self, monkeypatch) -> None:
-        monkeypatch.setenv("MAX_CONCURRENT", "5")
+        monkeypatch.setenv("LO_MAX_CONCURRENT", "5")
         pool = ConversionPool()
         assert pool.max_concurrent == 5
 

@@ -1,7 +1,7 @@
 """Pool 模块：Semaphore 并发控制。
 
 每个 LO 进程峰值内存 ~500MB-1GB。通过 Semaphore 限制同时运行的
-LO 进程数，防止 OOM。默认并发数为 10，可通过 MAX_CONCURRENT 环境变量调整。
+LO 进程数，防止 OOM。默认并发数为 10，可通过 LO_MAX_CONCURRENT 环境变量调整。
 """
 
 from __future__ import annotations
@@ -22,14 +22,14 @@ class ConversionPool:
             # 在信号量保护下运行 LO
             subprocess.run([soffice, ...])
 
-    默认最大并发数 10，通过环境变量 ``MAX_CONCURRENT`` 调整::
+    默认最大并发数 10，通过环境变量 ``LO_MAX_CONCURRENT`` 调整::
 
-        MAX_CONCURRENT=4 python -m pydoctrans
+        LO_MAX_CONCURRENT=4 python -m pydoctrans
     """
 
     def __init__(self, max_concurrent: Optional[int] = None) -> None:
         if max_concurrent is None:
-            max_concurrent = int(os.environ.get("MAX_CONCURRENT", "10"))
+            max_concurrent = int(os.environ.get("LO_MAX_CONCURRENT", "10"))
         if max_concurrent < 1:
             raise ValueError(f"max_concurrent 必须 >= 1，当前值: {max_concurrent}")
         self._semaphore = threading.Semaphore(max_concurrent)

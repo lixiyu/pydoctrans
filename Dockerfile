@@ -9,7 +9,7 @@
 #
 # 配置（环境变量）:
 #   docker run -p 8000:8000 \
-#     -e MAX_CONCURRENT=4 \
+#     -e LO_MAX_CONCURRENT=4 \
 #     -e LO_TIMEOUT=120 \
 #     pydoctrans
 
@@ -70,7 +70,7 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
 
 ENV HOST=0.0.0.0
 ENV PORT=8000
-ENV MAX_CONCURRENT=10
+ENV LO_MAX_CONCURRENT=10
 ENV LO_TIMEOUT=300
 ENV MAX_FILE_SIZE_MB=50
 ENV TMP_DIR=/tmp
