@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pydoctrans"
-version = "1.0.0"
+version = "1.0.1"
 description = "Python 文档转换器 — 简单、稳定、快速的服务端文档格式转换"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "xiyu"},
+    {name = "xiyu", email = "lxylixiyu@foxmail.com"},
 ]
 keywords = ["document", "conversion", "libreoffice", "pdf", "word", "excel"]
 classifiers = [
