@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -18,6 +19,25 @@ from pydoctrans.pool import ConversionPool
 from pydoctrans.sandbox import Sandbox, cleanup_orphan_sandboxes
 
 logger = logging.getLogger(__name__)
+
+
+def _kill_process_group(proc: subprocess.Popen | None) -> None:
+    """SIGKILL 整个进程组并收割，防止 soffice.bin 孤儿/僵尸残留。
+
+    LibreOffice 的 soffice 只是启动器，真正干活的是它 fork 出的 soffice.bin。
+    只杀直接子进程会导致 soffice.bin 被孤儿化、继续占管道/CPU；这里按进程组
+    整组击杀（配合 start_new_session=True 使用）。
+    """
+    if proc is None or proc.pid is None:
+        return
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    try:
+        proc.communicate()  # 收割直接子进程，避免变真·僵尸
+    except Exception:
+        pass
 
 # 模块级共享并发池
 _pool: ConversionPool | None = None
@@ -159,30 +179,44 @@ class LibreOfficeEngine(Engine):
 
         env = sandbox.get_env()
 
+        proc = None
         try:
-            result = subprocess.run(
+            # 自成进程组（start_new_session），超时才能整组 kill，
+            # 避免 soffice 只是启动器、fork 出的 soffice.bin 成为孤儿继续占管道/CPU。
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout,
                 env=env,
                 cwd=sandbox.home,
+                start_new_session=True,
             )
-        except subprocess.TimeoutExpired as e:
-            logger.error("LO 转换超时: %s → %s (%.0fs)", file_name, to, timeout)
-            raise TimeoutError(
-                f"LibreOffice 转换超时（{timeout}s）: {file_name}"
-            ) from e
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired as e:
+                _kill_process_group(proc)
+                logger.error("LO 转换超时: %s → %s (%.0fs)", file_name, to, timeout)
+                raise TimeoutError(
+                    f"LibreOffice 转换超时（{timeout}s）: {file_name}"
+                ) from e
+            returncode = proc.returncode
+        except TimeoutError:
+            raise
+        except Exception:
+            # 启动/执行异常也尝试清理进程组，避免残留
+            _kill_process_group(proc)
+            raise
 
-        if result.returncode != 0:
-            stderr_tail = result.stderr.strip()[-1000:]
-            stdout_tail = result.stdout.strip()[-500:]
+        if returncode != 0:
+            stderr_tail = (stderr or "").strip()[-1000:]
+            stdout_tail = (stdout or "").strip()[-500:]
             logger.error(
                 "LO 转换失败 (rc=%d, file=%s): stderr=%s",
-                result.returncode, file_name, stderr_tail,
+                returncode, file_name, stderr_tail,
             )
             raise ConversionError(
-                f"LibreOffice 转换失败 (退出码 {result.returncode})",
+                f"LibreOffice 转换失败 (退出码 {returncode})",
                 engine=self.name,
             )
 
